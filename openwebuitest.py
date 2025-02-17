@@ -1,86 +1,49 @@
 """
-title: RAG Document Chat Pipeline
-author: BrainDrive.ai
-date: 2025-02-17
+title: Llama Index Pipeline
+author: open-webui
+date: 2024-05-30
 version: 1.0
 license: MIT
-description: A pipeline to ingest documents, retrieve context from Chroma, and answer questions via OpenWebUI tool calling.
-requirements: langchain, langchain-openai, chromadb, pydantic, langchain-community, langchain-text-splitters
+description: A pipeline for retrieving relevant information from a knowledge base using the Llama Index library.
+requirements: llama-index
 """
 
-import os
-from typing import List, Sequence
-from pydantic import BaseModel, Field
-from langchain_community.vectorstores import Chroma
-from langchain_community.embeddings import OpenAIEmbeddings
-from langchain_community.document_loaders import TextLoader, PyPDFLoader
-from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_openai import ChatOpenAI
-from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.tools import tool
-
-
-class IngestDocumentInput(BaseModel):
-    file_path: str = Field(description="Path to the document (PDF or TXT) to ingest.")
-
-
-@tool("ingest_document", args_schema=IngestDocumentInput, return_direct=True)
-def ingest_document(file_path: str) -> str:
-    """Loads a document, splits it into chunks, and stores embeddings in Chroma."""
-    try:
-        if file_path.endswith(".pdf"):
-            loader = PyPDFLoader(file_path)
-        else:
-            loader = TextLoader(file_path)
-
-        docs = loader.load()
-        text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
-        chunks = text_splitter.split_documents(docs)
-
-        vectorstore.add_documents(chunks)
-        vectorstore.persist()
-        return f"Ingested {len(chunks)} chunks from {file_path}."
-    except Exception as e:
-        return f"Failed to ingest document: {str(e)}"
-
-
-class RetrieveAndAnswerInput(BaseModel):
-    question: str = Field(description="User's question to retrieve relevant context and generate an answer.")
-
-
-@tool("retrieve_and_answer", args_schema=RetrieveAndAnswerInput, return_direct=True)
-def retrieve_and_answer(question: str) -> str:
-    """Retrieves relevant context from the vector database and generates an answer."""
-    try:
-        retriever = vectorstore.as_retriever(search_kwargs={"k": 5})
-        relevant_docs = retriever.get_relevant_documents(question)
-
-        context = "\n\n".join([doc.page_content for doc in relevant_docs])
-
-        model = ChatOpenAI(api_key=os.getenv("OPENAI_API_KEY"), model="gpt-4o")
-        prompt = ChatPromptTemplate.from_messages([
-            ("system", "You are a helpful assistant using retrieved context to answer questions."),
-            ("user", f"Context:\n{context}\n\nQuestion: {question}")
-        ])
-
-        response = model.invoke(prompt.format_prompt())
-        return response.content
-
-    except Exception as e:
-        return f"Failed to retrieve or answer: {str(e)}"
+from typing import List, Union, Generator, Iterator
+from schemas import OpenAIChatMessage
 
 
 class Pipeline:
     def __init__(self):
-        self.name = "RAG Document Chat"
-        self.tools = [ingest_document, retrieve_and_answer]
+        self.documents = None
+        self.index = None
 
+    async def on_startup(self):
+        import os
 
-# Initialize vectorstore outside tools so it's shared
-vectorstore = Chroma(
-    persist_directory="./chroma_db",
-    embedding_function=OpenAIEmbeddings(
-        openai_api_key=os.getenv("OPENAI_API_KEY"),
-        model="text-embedding-ada-002"
-    )
-)
+        # Set the OpenAI API key
+        os.environ["OPENAI_API_KEY"] = "your-api-key-here"
+
+        from llama_index.core import VectorStoreIndex, SimpleDirectoryReader
+
+        self.documents = SimpleDirectoryReader("./data").load_data()
+        self.index = VectorStoreIndex.from_documents(self.documents)
+        # This function is called when the server is started.
+        pass
+
+    async def on_shutdown(self):
+        # This function is called when the server is stopped.
+        pass
+
+    def pipe(
+        self, user_message: str, model_id: str, messages: List[dict], body: dict
+    ) -> Union[str, Generator, Iterator]:
+        # This is where you can add your custom RAG pipeline.
+        # Typically, you would retrieve relevant information from your knowledge base and synthesize it to generate a response.
+
+        print(messages)
+        print(user_message)
+
+        query_engine = self.index.as_query_engine(streaming=True)
+        response = query_engine.query(user_message)
+
+        return response.response_gen
