@@ -10,6 +10,8 @@ requirements: llama-index
 
 from typing import List, Union, Generator, Iterator
 from schemas import OpenAIChatMessage
+from llama_index.core import Document
+from llama_index.core.readers.file import PyMuPDFReader
 
 
 class Pipeline:
@@ -25,7 +27,11 @@ class Pipeline:
 
         from llama_index.core import VectorStoreIndex, SimpleDirectoryReader
 
-        self.documents = SimpleDirectoryReader("sample-new-fidelity-acnt-stmt.pdf").load_data()
+        
+
+        loader = PyMuPDFReader()
+        self.documents = loader.load(file_path="sample-new-fidelity-acnt-stmt.pdf")
+
         self.index = VectorStoreIndex.from_documents(self.documents)
         # This function is called when the server is started.
         pass
