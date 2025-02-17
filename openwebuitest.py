@@ -21,11 +21,11 @@ class Pipeline:
         import os
 
         # Set the OpenAI API key
-        os.environ["OPENAI_API_KEY"] = "your-api-key-here"
+        os.environ["OPENAI_API_KEY"] = "sk-15M1TItzOVNEhQpbADjrT3BlbkFJ1yTif5InlqSkdyrSwQTge"
 
         from llama_index.core import VectorStoreIndex, SimpleDirectoryReader
 
-        self.documents = SimpleDirectoryReader("./data").load_data()
+        self.documents = SimpleDirectoryReader("sample-new-fidelity-acnt-stmt.pdf").load_data()
         self.index = VectorStoreIndex.from_documents(self.documents)
         # This function is called when the server is started.
         pass
